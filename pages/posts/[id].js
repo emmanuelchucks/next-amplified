@@ -1,81 +1,46 @@
-import { Amplify, API, withSSRContext } from "aws-amplify";
+import { DataStore } from "aws-amplify";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import awsExports from "../../aws-exports";
-import { deletePost } from "../../graphql/mutations";
-import { getPost, listPosts } from "../../graphql/queries";
+import { useEffect, useState } from "react";
+import { Post } from "../../models";
 import styles from "../../styles/Home.module.css";
 
-Amplify.configure({ ...awsExports, ssr: true });
-
-export async function getStaticPaths() {
-  const SSR = withSSRContext();
-  const { data } = await SSR.API.graphql({ query: listPosts });
-  const paths = data.listPosts.items.map((post) => ({
-    params: { id: post.id },
-  }));
-
-  return {
-    fallback: true,
-    paths,
-  };
-}
-
-export async function getStaticProps({ params }) {
-  const SSR = withSSRContext();
-  const { data } = await SSR.API.graphql({
-    query: getPost,
-    variables: {
-      id: params.id,
-    },
-  });
-
-  return {
-    props: {
-      post: data.getPost,
-    },
-  };
-}
-
-export default function Post({ post }) {
+export default function PostPage() {
   const router = useRouter();
+  const [post, setPost] = useState();
 
-  if (router.isFallback) {
-    return (
-      <div className={styles.container}>
-        <h1 className={styles.title}>Loading&hellip;</h1>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const { id } = router.query;
+    const subscription = DataStore.observeQuery(Post, (post) =>
+      post.id("eq", id)
+    ).subscribe(({ items }) => setPost(items[0]));
+    return () => subscription.unsubscribe();
+  }, [router.query]);
 
   async function handleDelete() {
     try {
-      await API.graphql({
-        authMode: "AMAZON_COGNITO_USER_POOLS",
-        query: deletePost,
-        variables: {
-          input: { id: post.id },
-        },
-      });
+      const postToDelete = await DataStore.query(Post, post.id);
+      DataStore.delete(postToDelete);
 
       window.location.href = "/";
-    } catch ({ errors }) {
-      console.error(...errors);
-      throw new Error(errors[0].message);
+    } catch (error) {
+      console.error(error);
     }
   }
 
   return (
     <div className={styles.container}>
       <Head>
-        <title>{post.title} – Amplify + Next.js</title>
+        <title>{post?.title} – Amplify + Next.js</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
       <main className={styles.main}>
-        <h1 className={styles.title}>{post.title}</h1>
+        <h1 className={styles.title}>{post?.title}</h1>
 
-        <p className={styles.description}>{post.content}</p>
+        <p className={styles.description}>{post?.content}</p>
+        <p className={styles.description}>{post?.rating}</p>
+        <p className={styles.description}>{post?.status}</p>
       </main>
 
       <footer className={styles.footer}>

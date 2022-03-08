@@ -15,6 +15,11 @@
         "mode": "AMAZON_COGNITO_USER_POOLS",
         "cognitoUserPoolId": "authnextamplified4e654715"
       }
-    ]
+    ],
+    "conflictResolution": {
+      "defaultResolutionStrategy": {
+        "type": "AUTOMERGE"
+      }
+    }
   }
 }

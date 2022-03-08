@@ -1,49 +1,40 @@
-import { AmplifyAuthenticator } from "@aws-amplify/ui-react";
-import { Amplify, API, Auth, withSSRContext } from "aws-amplify";
+import { DataStore } from "aws-amplify";
 import Head from "next/head";
-import awsExports from "../aws-exports";
-import { createPost } from "../graphql/mutations";
-import { listPosts } from "../graphql/queries";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Post, PostStatus } from "../models";
 import styles from "../styles/Home.module.css";
-
-Amplify.configure({ ...awsExports, ssr: true });
-
-export async function getStaticProps({ req }) {
-  const SSR = withSSRContext({ req });
-  const response = await SSR.API.graphql({ query: listPosts });
-
-  return {
-    props: {
-      posts: response.data.listPosts.items,
-    },
-  };
-}
 
 async function handleCreatePost(event) {
   event.preventDefault();
-
   const form = new FormData(event.target);
 
   try {
-    const { data } = await API.graphql({
-      authMode: "AMAZON_COGNITO_USER_POOLS",
-      query: createPost,
-      variables: {
-        input: {
-          title: form.get("title"),
-          content: form.get("content"),
-        },
-      },
-    });
+    const data = await DataStore.save(
+      new Post({
+        title: form.get("title"),
+        content: form.get("content"),
+        rating: Number(form.get("rating")),
+        status: PostStatus.DRAFT,
+      })
+    );
 
-    window.location.href = `/posts/${data.createPost.id}`;
-  } catch ({ errors }) {
-    console.error(...errors);
-    throw new Error(errors[0].message);
+    window.location.href = `/posts/${data.id}`;
+  } catch (error) {
+    console.error(error);
   }
 }
 
-export default function Home({ posts = [] }) {
+export default function Home() {
+  const [posts, setPosts] = useState([]);
+
+  useEffect(() => {
+    const subscription = DataStore.observeQuery(Post).subscribe(({ items }) =>
+      setPosts(items)
+    );
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <div className={styles.container}>
       <Head>
@@ -61,39 +52,43 @@ export default function Home({ posts = [] }) {
 
         <div className={styles.grid}>
           {posts.map((post) => (
-            <a className={styles.card} href={`/posts/${post.id}`} key={post.id}>
-              <h3>{post.title}</h3>
-              <p>{post.content}</p>
-            </a>
+            <Link href={`/posts/${post.id}`} key={post.id}>
+              <a className={styles.card}>
+                <h3>{post.title}</h3>
+                <p>{post.content}</p>
+                <p>{post.rating}</p>
+                <p>{post.status}</p>
+              </a>
+            </Link>
           ))}
 
           <div className={styles.card}>
             <h3 className={styles.title}>New Post</h3>
 
-            <AmplifyAuthenticator>
-              <form onSubmit={handleCreatePost}>
-                <fieldset>
-                  <legend>Title</legend>
-                  <input
-                    defaultValue={`Today, ${new Date().toLocaleTimeString()}`}
-                    name="title"
-                  />
-                </fieldset>
+            <form onSubmit={handleCreatePost}>
+              <fieldset>
+                <legend>Title</legend>
+                <input
+                  defaultValue={`Today, ${new Date().toLocaleTimeString()}`}
+                  name="title"
+                />
+              </fieldset>
 
-                <fieldset>
-                  <legend>Content</legend>
-                  <textarea
-                    defaultValue="I built an Amplify app with Next.js!"
-                    name="content"
-                  />
-                </fieldset>
+              <fieldset>
+                <legend>Content</legend>
+                <textarea
+                  defaultValue="I built an Amplify app with Next.js!"
+                  name="content"
+                />
+              </fieldset>
 
-                <button>Create Post</button>
-                <button type="button" onClick={() => Auth.signOut()}>
-                  Sign out
-                </button>
-              </form>
-            </AmplifyAuthenticator>
+              <fieldset>
+                <legend>Rating</legend>
+                <input type="number" defaultValue="5" name="rating" />
+              </fieldset>
+
+              <button>Create Post</button>
+            </form>
           </div>
         </div>
       </main>

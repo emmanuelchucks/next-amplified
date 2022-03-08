@@ -1,7 +1,12 @@
-type Post
-  @model
-  @auth(rules: [{ allow: owner }, { allow: public, operations: [read] }]) {
+type Post @model {
   id: ID!
   title: String!
-  content: String!
+  status: PostStatus!
+  rating: Int
+  content: String
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
 }

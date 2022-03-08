@@ -1,4 +1,4 @@
-type Post @model {
+type Post @model @auth(rules: [{ allow: public }]) {
   id: ID!
   title: String!
   status: PostStatus!
